@@ -1,7 +1,8 @@
 import re
 import unicodedata
 from psycopg2.extras import execute_values
-
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
 from scraper.db import get_conn
 from scraper.fetch import fetch_rendered_html
 
@@ -15,125 +16,107 @@ def norm(s: str) -> str:
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
+
+BASE = "https://www.footmercato.net"
+
 def parse_standings(html: str):
-    from bs4 import BeautifulSoup
-
     soup = BeautifulSoup(html, "html.parser")
-    raw_text = soup.get_text(" ", strip=True)
 
-    # tokens "bruts" (pour reconstruire le nom d'équipe)
-    raw_tokens = raw_text.split()
+    def to_int(td):
+        txt = td.get_text(" ", strip=True).replace("+", "")
+        txt = re.sub(r"[^\d\-]", "", txt)
+        return int(txt or 0)
 
-    # tokens normalisés (pour matcher sans accents, etc.)
-    def n(s: str) -> str:
-        import re, unicodedata
-        s = s.replace("\xa0", " ")
-        s = unicodedata.normalize("NFKD", s)
-        s = "".join(c for c in s if not unicodedata.combining(c))
-        s = re.sub(r"\s+", " ", s).strip().lower()
-        return s
-
-    tokens = [n(t) for t in raw_tokens]
-
-    def is_int(tok: str) -> bool:
-        return tok.isdigit()
-
-    def is_signed_int(tok: str) -> bool:
-        import re
-        return re.match(r"^[+-]?\d+$", tok) is not None
-
-    # 1) trouver l'endroit du header (équipe pts j dif g n d bp bc)
-    header_seq = ["equipe", "pts", "j", "dif", "g", "n", "d", "bp", "bc"]
-    start = 0
-    for i in range(len(tokens) - len(header_seq)):
-        if tokens[i:i+len(header_seq)] == header_seq:
-            start = i + len(header_seq)
-            break
-    # si on ne trouve pas exactement, on ne bloque pas : on démarre plus loin
-    # (le tableau est parfois plus bas)
-    # on prend un start raisonnable (après "classement" / saison) si possible
-    if start == 0:
-        for i, t in enumerate(tokens):
-            if t == "classement":
-                start = i
-                break
+    # On prend le premier tableau qui ressemble à un classement
+    table = soup.find("table")
+    if not table:
+        raise RuntimeError("Table classement introuvable.")
 
     rows = []
-    i = start
-
-    # 2) extraire 18 équipes : rank + team + 8 champs numériques
-    # champs attendus après team : pts, played, diff, w, d, l, bp, bc
-    expected_rank = 1
-    while expected_rank <= 18 and i < len(tokens):
-        # chercher le prochain rank (1..18) à partir de i
-        try:
-            rpos = tokens.index(str(expected_rank), i)
-        except ValueError:
-            break
-
-        j = rpos + 1  # début du nom d'équipe
-        k = j
-
-        # chercher la première position k où tokens[k:k+8] correspond au pattern numérique
-        found = None
-        while k + 7 < len(tokens) and k < j + 12:  # nom équipe pas trop long
-            if (
-                is_int(tokens[k]) and
-                is_int(tokens[k+1]) and
-                is_signed_int(tokens[k+2]) and
-                is_int(tokens[k+3]) and
-                is_int(tokens[k+4]) and
-                is_int(tokens[k+5]) and
-                is_int(tokens[k+6]) and
-                is_int(tokens[k+7])
-            ):
-                found = k
-                break
-            k += 1
-
-        if found is None:
-            # on n'a pas réussi à parser ce rank -> on avance et on retente
-            i = rpos + 1
+    for tr in table.find_all("tr"):
+        tds = tr.find_all(["td", "th"])
+        if len(tds) < 5:
             continue
 
-        team = " ".join(raw_tokens[j:found]).strip()
-        pts = int(tokens[found])
-        played = int(tokens[found+1])
-        diff = int(tokens[found+2])
-        w = int(tokens[found+3])
-        d = int(tokens[found+4])
-        l = int(tokens[found+5])
-        bp = int(tokens[found+6])
-        bc = int(tokens[found+7])
+        # Rank (souvent 1ère colonne)
+        rank_txt = tds[0].get_text(" ", strip=True)
+        if not rank_txt.isdigit():
+            continue
+        rank = int(rank_txt)
 
-        rows.append(dict(
-            season=SEASON,
-            rank=expected_rank,
-            team=team,
-            points=pts,
-            played=played,
-            wins=w,
-            draws=d,
-            losses=l,
-            goals_for=bp,
-            goals_against=bc,
-            goal_diff=diff
-        ))
+        # Team + logo : on cherche un lien + image dans la ligne
+        team = None
+        logo_url = None
 
-        expected_rank += 1
-        i = found + 8
+        a = tr.find("a")
+        if a:
+            team = a.get_text(" ", strip=True)
+
+        img = tr.find("img")
+        if img:
+            src = (
+                img.get("data-src")
+                or img.get("data-lazy-src")
+                or img.get("data-original")
+                or img.get("srcset")
+                or img.get("src")
+            )
+            if src:
+            # si srcset: "url 1x, url2 2x" -> on prend la première url
+                if " " in src and "," in src:
+                    src = src.split(",")[0].strip().split(" ")[0].strip()
+                # ignore les placeholders svg
+                if not src.startswith("data:image"):
+                    logo_url = urljoin(BASE, src)
+
+        # Récupération des chiffres (selon structure : played/w/d/l/gf/ga/gd/pts)
+        nums = [td.get_text(" ", strip=True) for td in tds]
+        nums = [re.sub(r"[^\d\-]", "", x) for x in nums]  # garde digits et -
+        nums = [x for x in nums if x != ""]
+
+        # Ici on suppose un format classique :
+        # rank, ..., played, wins, draws, losses, goals_for, goals_against, goal_diff, points
+        # On prend les 8 derniers nombres comme (played..points)
+        if len(nums) < 9:
+            continue
+        tail = nums[-8:]  # played,wins,draws,losses,gf,ga,gd,pts
+
+        #played, wins, draws, losses, gf, ga, gd, pts = map(int, tail)
+        pts    = to_int(tds[2])  # Pts
+        played = to_int(tds[3])  # J
+        gd     = to_int(tds[4])  # DIF
+        wins   = to_int(tds[5])  # G
+        draws  = to_int(tds[6])  # N
+        losses = to_int(tds[7])  # D
+        gf     = to_int(tds[8])  # BP
+        ga     = to_int(tds[9])  # BC
+
+
+        rows.append({
+            "season": "2025/2026",
+            "rank": rank,
+            "team": team,
+            "played": played,
+            "wins": wins,
+            "draws": draws,
+            "losses": losses,
+            "goals_for": gf,
+            "goals_against": ga,
+            "goal_diff": gd,
+            "points": pts,
+            "logo_url": logo_url,
+        })
 
     if len(rows) < 10:
-        print("DEBUG: tokens autour du début du tableau (200 tokens):")
-        print(" ".join(raw_tokens[start:start+200]))
-        raise RuntimeError("Impossible d'extraire le classement (tableau non détecté).")
+        raise RuntimeError("Pas assez de lignes parsées pour le classement (structure différente).")
 
     return rows
+
 
 def upsert_standings(rows):
     sql = """
     INSERT INTO standings
-    (season, rank, team, played, wins, draws, losses, goals_for, goals_against, goal_diff, points)
+    (season, rank, team, played, wins, draws, losses, goals_for, goals_against, goal_diff, points, logo_url)
     VALUES %s
     ON CONFLICT (season, team)
     DO UPDATE SET
@@ -146,6 +129,7 @@ def upsert_standings(rows):
       goals_against = EXCLUDED.goals_against,
       goal_diff = EXCLUDED.goal_diff,
       points = EXCLUDED.points,
+      logo_url = EXCLUDED.logo_url,
       scraped_at = CURRENT_TIMESTAMP;
     """
 
@@ -153,7 +137,7 @@ def upsert_standings(rows):
         (
             r["season"], r["rank"], r["team"], r["played"],
             r["wins"], r["draws"], r["losses"],
-            r["goals_for"], r["goals_against"], r["goal_diff"], r["points"]
+            r["goals_for"], r["goals_against"], r["goal_diff"], r["points"], r.get("logo_url")
         )
         for r in rows
     ]

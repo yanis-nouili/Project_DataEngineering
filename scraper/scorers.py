@@ -15,6 +15,7 @@ def norm(s: str) -> str:
     s = re.sub(r"\s+", " ", s).strip().lower()
     return s
 
+
 def parse_scorers(html: str):
     from bs4 import BeautifulSoup
 
@@ -105,6 +106,7 @@ def parse_scorers(html: str):
             continue
         if current_rank <= 0 or not player_name:
             continue
+
 
         rows.append(
             dict(

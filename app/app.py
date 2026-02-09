@@ -71,7 +71,7 @@ if page == "Classement":
 
     df = load_df(f"""
         SELECT
-            rank AS "rank",team AS "Equipe", played AS "Matchs joués",wins AS "Victoires", draws AS "Nuls",
+            rank AS "rank", logo_url AS "Logo", team AS "Equipe", played AS "Matchs joués",wins AS "Victoires", draws AS "Nuls",
             losses AS "Défaites", goals_for AS "Buts pour", goals_against AS "Buts contre",goal_diff AS "Différence de but",
             points AS "Points"
         FROM standings
@@ -82,7 +82,10 @@ if page == "Classement":
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.dataframe(df, use_container_width=True, height=650)
+       st.dataframe(df,use_container_width=True,height=650,column_config={"Logo": st.column_config.ImageColumn("Logo",
+       width="small"),},
+       )
+
     with col2:
         st.metric("Équipes", len(df))
         if len(df):
@@ -196,7 +199,12 @@ elif page == "Contributions":
         st.dataframe(df, use_container_width=True, height=650)
     with col2:
         st.metric("Joueurs", len(df))
+
         st.write("Top 10 (contributions)")
-        top = df.head(10).copy()
-        top["label"] = top["Contributions"].astype(int).astype(str) + " - " + top["Joueur"]
-        st.bar_chart(top.set_index("label")["Contributions"])
+        top = df.sort_values(["Contributions", "Buts", "Assists"], ascending=[False, False, False]).head(10)
+        chart = alt.Chart(top).mark_bar().encode(
+            y=alt.Y("Joueur:N", sort="-x", title="Joueur"),
+            x=alt.X("Contributions:Q", title="Contributions (buts + passes)"),
+            tooltip=["Joueur", "Contributions", "Buts", "Assists"],
+        ).properties(height=520)
+        st.altair_chart(chart, use_container_width=True)
