@@ -3,9 +3,18 @@ import pandas as pd
 import streamlit as st
 import psycopg2
 from dotenv import load_dotenv
+import altair as alt
 load_dotenv()
 
 st.set_page_config(page_title="Ligue 1 Dashboard", layout="wide")
+
+def load_css():
+    css_path = os.path.join(os.path.dirname(__file__), "style.css")
+    with open(css_path, "r", encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
+load_css()
+
 
 SEASON = os.environ.get("SEASON", "2025/2026")
 
@@ -29,7 +38,33 @@ def load_df(query: str) -> pd.DataFrame:
 st.title("Ligue 1 — Dashboard")
 st.caption("Données scrapées depuis Foot Mercato, stockées dans PostgreSQL (Docker).")
 
-page = st.sidebar.radio("Navigation", ["Classement", "Buteurs", "Passeurs", "Contributions"])
+page = st.sidebar.radio("Navigation", ["Accueil", "Classement", "Buteurs", "Passeurs", "Contributions"])
+#page = st.sidebar.radio("Navigation", ["Classement", "Buteurs", "Passeurs", "Contributions"])
+
+
+
+if page == "Accueil":
+    st.subheader("Aperçu")
+    st.write("Dashboard Ligue 1 : Classement, Buteurs, Passeurs et Contributions.")
+
+    # KPIs rapides
+    standings = load_df(f"SELECT team, points FROM standings WHERE season='{SEASON}' ORDER BY rank LIMIT 1;")
+    scorers = load_df(f"SELECT player_name, goals FROM scorers WHERE season='{SEASON}' ORDER BY goals DESC, rank ASC LIMIT 1;")
+    assists = load_df(f"SELECT player_name, assists FROM assists WHERE season='{SEASON}' ORDER BY assists DESC, rank ASC LIMIT 1;")
+
+    k1, k2, k3 = st.columns(3)
+    if len(standings):
+        k1.metric("Leader", standings.iloc[0]["team"], f"{int(standings.iloc[0]['points'])} pts")
+    if len(scorers):
+        k2.metric("Meilleur buteur", scorers.iloc[0]["player_name"], f"{int(scorers.iloc[0]['goals'])} buts")
+    if len(assists):
+        k3.metric("Meilleur passeur", assists.iloc[0]["player_name"], f"{int(assists.iloc[0]['assists'])} passes")
+
+    st.markdown("---")
+    st.info("Utilise le menu à gauche pour naviguer.")
+
+
+
 
 if page == "Classement":
     st.subheader("Classement")
@@ -83,10 +118,20 @@ elif page == "Buteurs":
     with col2:
         st.metric("Joueurs", len(df))
         st.write("Top 10 (buts) — triés par buts")
-        top = df.sort_values(["Buts", "rank"], ascending=[False, True]).head(10).copy()
-        top = top.iloc[::-1]
-        top["label"] = top["Buts"].astype(str) + " - " + top["Joueur"]
-        st.bar_chart(top.set_index("label")["Buts"])
+        
+
+        top = df.sort_values(["Buts", "rank"], ascending=[False, True]).head(15)
+
+        chart = alt.Chart(top).mark_bar().encode(
+            y=alt.Y("Joueur:N", sort="-x", title="Joueur"),
+            x=alt.X("Buts:Q", title="Buts"),
+            tooltip=["Joueur", "Buts", "Pénaltys"]
+        ).properties(height=520)
+        st.altair_chart(chart, use_container_width=True)
+        #top = df.sort_values(["Buts", "rank"], ascending=[False, True]).head(10).copy()
+        #top = top.iloc[::-1]
+        #top["label"] = top["Buts"].astype(str) + " - " + top["Joueur"]
+        #st.bar_chart(top.set_index("label")["Buts"])
 
 elif page == "Passeurs":
     st.subheader("Passeurs")
@@ -110,10 +155,20 @@ elif page == "Passeurs":
     with col2:
         st.metric("Joueurs", len(df))
         st.write("Top 10 (passes décisives) — triés par passes")
-        top = df.sort_values(["Assists", "rank"], ascending=[False, True]).head(10).copy()
-        top = top.iloc[::-1]
-        top["label"] = top["Assists"].astype(str) + " - " + top["Joueur"]
-        st.bar_chart(top.set_index("label")["Assists"])
+        
+        top = df.sort_values(["Assists", "rank"], ascending=[False, True]).head(15)
+        chart = alt.Chart(top).mark_bar().encode(
+            y=alt.Y("Joueur:N", sort="-x", title="Joueur"),
+            x=alt.X("Assists:Q", title="Passes décisives"),
+            tooltip=["Joueur", "Assists"]
+        ).properties(height=520)
+        st.altair_chart(chart, use_container_width=True)
+
+
+        #top = df.sort_values(["Assists", "rank"], ascending=[False, True]).head(10).copy()
+        #top = top.iloc[::-1]
+        #top["label"] = top["Assists"].astype(str) + " - " + top["Joueur"]
+        #st.bar_chart(top.set_index("label")["Assists"])
 
 
 elif page == "Contributions":
