@@ -4,20 +4,27 @@ import streamlit as st
 import psycopg2
 from dotenv import load_dotenv
 import altair as alt
+
 load_dotenv()
 
 st.set_page_config(page_title="Ligue 1 Dashboard", layout="wide")
 
+# ========================
+# CSS
+# ========================
 def load_css():
     css_path = os.path.join(os.path.dirname(__file__), "style.css")
-    with open(css_path, "r", encoding="utf-8") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    if os.path.exists(css_path):
+        with open(css_path, "r", encoding="utf-8") as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 load_css()
 
-
 SEASON = os.environ.get("SEASON", "2025/2026")
 
+# ========================
+# DB
+# ========================
 def get_conn():
     return psycopg2.connect(
         dbname=os.environ["POSTGRES_DB"],
@@ -28,183 +35,222 @@ def get_conn():
     )
 
 @st.cache_data(ttl=60)
-def load_df(query: str) -> pd.DataFrame:
+def load_df(query: str):
     conn = get_conn()
     try:
         return pd.read_sql(query, conn)
     finally:
         conn.close()
 
+# ========================
+# NAVIGATION
+# ========================
 st.title("Ligue 1 — Dashboard")
-st.caption("Données scrapées depuis Foot Mercato, stockées dans PostgreSQL (Docker).")
 
-page = st.sidebar.radio("Navigation", ["Accueil", "Classement", "Buteurs", "Passeurs", "Contributions"])
-#page = st.sidebar.radio("Navigation", ["Classement", "Buteurs", "Passeurs", "Contributions"])
+page = st.sidebar.radio(
+    "Navigation",
+    [
+        "Accueil",
+        "Classement",
+        "Buteurs",
+        "Passeurs",
+        "Contributions",
+        "Gardiens 🧤",
+        "Prédictions 🔮",
+    ],
+)
 
-
-
+# ========================
+# ACCUEIL
+# ========================
 if page == "Accueil":
-    st.subheader("Aperçu")
-    st.write("Dashboard Ligue 1 : Classement, Buteurs, Passeurs et Contributions.")
 
-    # KPIs rapides
-    standings = load_df(f"SELECT team, points FROM standings WHERE season='{SEASON}' ORDER BY rank LIMIT 1;")
-    scorers = load_df(f"SELECT player_name, goals FROM scorers WHERE season='{SEASON}' ORDER BY goals DESC, rank ASC LIMIT 1;")
-    assists = load_df(f"SELECT player_name, assists FROM assists WHERE season='{SEASON}' ORDER BY assists DESC, rank ASC LIMIT 1;")
+    st.subheader("Aperçu Ligue 1")
+
+    standings = load_df(f"""
+        SELECT team, points
+        FROM standings
+        WHERE season='{SEASON}'
+        ORDER BY rank LIMIT 1;
+    """)
+
+    scorers = load_df(f"""
+        SELECT player_name, goals
+        FROM scorers
+        WHERE season='{SEASON}'
+        ORDER BY goals DESC LIMIT 1;
+    """)
+
+    assists = load_df(f"""
+        SELECT player_name, assists
+        FROM assists
+        WHERE season='{SEASON}'
+        ORDER BY assists DESC LIMIT 1;
+    """)
 
     k1, k2, k3 = st.columns(3)
+
     if len(standings):
-        k1.metric("Leader", standings.iloc[0]["team"], f"{int(standings.iloc[0]['points'])} pts")
+        k1.metric("Leader", standings.iloc[0]["team"],
+                  f"{int(standings.iloc[0]['points'])} pts")
+
     if len(scorers):
-        k2.metric("Meilleur buteur", scorers.iloc[0]["player_name"], f"{int(scorers.iloc[0]['goals'])} buts")
+        k2.metric("Meilleur buteur",
+                  scorers.iloc[0]["player_name"],
+                  f"{int(scorers.iloc[0]['goals'])} buts")
+
     if len(assists):
-        k3.metric("Meilleur passeur", assists.iloc[0]["player_name"], f"{int(assists.iloc[0]['assists'])} passes")
+        k3.metric("Meilleur passeur",
+                  assists.iloc[0]["player_name"],
+                  f"{int(assists.iloc[0]['assists'])} passes")
 
-    st.markdown("---")
-    st.info("Utilise le menu à gauche pour naviguer.")
+# ========================
+# CLASSEMENT
+# ========================
+elif page == "Classement":
 
-
-
-
-if page == "Classement":
     st.subheader("Classement")
 
     df = load_df(f"""
         SELECT
-            rank AS "rank", logo_url AS "Logo", team AS "Equipe", played AS "Matchs joués",wins AS "Victoires", draws AS "Nuls",
-            losses AS "Défaites", goals_for AS "Buts pour", goals_against AS "Buts contre",goal_diff AS "Différence de but",
+            rank,
+            logo_url AS "Logo",
+            team AS "Equipe",
+            played AS "Matchs",
+            wins AS "Victoires",
+            draws AS "Nuls",
+            losses AS "Défaites",
+            goals_for AS "BP",
+            goals_against AS "BC",
+            goal_diff AS "Diff",
             points AS "Points"
         FROM standings
         WHERE season='{SEASON}'
         ORDER BY rank;
     """)
 
+    st.dataframe(
+        df,
+        use_container_width=True,
+        height=650,
+        column_config={
+            "Logo": st.column_config.ImageColumn(width="small")
+        },
+    )
 
-    col1, col2 = st.columns([2, 1])
-    with col1:
-       st.dataframe(df,use_container_width=True,height=650,column_config={"Logo": st.column_config.ImageColumn("Logo",
-       width="small"),},
-       )
+    st.markdown("### Top 6 équipes (points)")
 
-    with col2:
-        st.metric("Équipes", len(df))
-        if len(df):
-            st.metric("Leader", df.iloc[0]["Equipe"])
-            st.metric("Points leader", int(df.iloc[0]["Points"]))
-        st.write("Top 6 (points)")
-        if len(df) >= 6:
-            top6 = df.head(6).copy()
-            top6["label"] = top6["rank"].astype(str) + " - " + top6["Equipe"]
-            chart = top6.set_index("label")["Points"]
-            st.bar_chart(chart)
+    if len(df) >= 6:
+        top6 = df.head(6)
+        chart = alt.Chart(top6).mark_bar().encode(
+            y=alt.Y("Equipe:N", sort="-x"),
+            x="Points:Q",
+        )
+        st.altair_chart(chart, use_container_width=True)
 
+# ========================
+# BUTEURS
+# ========================
 elif page == "Buteurs":
+
     st.subheader("Buteurs")
+
     df = load_df(f"""
-        SELECT
-            rank AS "rank",
-            player_name AS "Joueur",
-            goals AS "Buts",
-            penalties AS "Pénaltys"
+        SELECT rank, player_name AS "Joueur",
+               goals AS "Buts",
+               penalties AS "Pénaltys"
         FROM scorers
         WHERE season='{SEASON}'
-        ORDER BY goals DESC, rank ASC, player_name ASC;
+        ORDER BY goals DESC;
     """)
 
-    q = st.text_input("Recherche joueur", "")
+    q = st.text_input("Recherche joueur")
     if q:
-        df = df[df["Joueur"].str.lower().str.contains(q.lower(), na=False)]
+        df = df[df["Joueur"].str.contains(q, case=False)]
 
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.dataframe(df, use_container_width=True, height=650)
-    with col2:
-        st.metric("Joueurs", len(df))
-        st.write("Top 10 (buts) — triés par buts")
-        
+    st.dataframe(df, use_container_width=True, height=650)
 
-        top = df.sort_values(["Buts", "rank"], ascending=[False, True]).head(15)
+    st.markdown("### Top buteurs")
 
-        chart = alt.Chart(top).mark_bar().encode(
-            y=alt.Y("Joueur:N", sort="-x", title="Joueur"),
-            x=alt.X("Buts:Q", title="Buts"),
-            tooltip=["Joueur", "Buts", "Pénaltys"]
-        ).properties(height=520)
-        st.altair_chart(chart, use_container_width=True)
-        #top = df.sort_values(["Buts", "rank"], ascending=[False, True]).head(10).copy()
-        #top = top.iloc[::-1]
-        #top["label"] = top["Buts"].astype(str) + " - " + top["Joueur"]
-        #st.bar_chart(top.set_index("label")["Buts"])
+    top = df.head(10)
 
+    chart = alt.Chart(top).mark_bar().encode(
+        y=alt.Y("Joueur:N", sort="-x"),
+        x="Buts:Q",
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+# ========================
+# PASSEURS
+# ========================
 elif page == "Passeurs":
+
     st.subheader("Passeurs")
+
     df = load_df(f"""
-        SELECT
-            rank AS "rank",
-            player_name AS "Joueur",
-            assists AS "Assists"
+        SELECT rank, player_name AS "Joueur",
+               assists AS "Passes"
         FROM assists
         WHERE season='{SEASON}'
-        ORDER BY assists DESC, rank ASC, player_name ASC;
+        ORDER BY assists DESC;
     """)
 
-    q = st.text_input("Recherche joueur", "")
+    q = st.text_input("Recherche joueur")
     if q:
-        df = df[df["Joueur"].str.lower().str.contains(q.lower(), na=False)]
+        df = df[df["Joueur"].str.contains(q, case=False)]
 
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.dataframe(df, use_container_width=True, height=650)
-    with col2:
-        st.metric("Joueurs", len(df))
-        st.write("Top 10 (passes décisives) — triés par passes")
-        
-        top = df.sort_values(["Assists", "rank"], ascending=[False, True]).head(15)
-        chart = alt.Chart(top).mark_bar().encode(
-            y=alt.Y("Joueur:N", sort="-x", title="Joueur"),
-            x=alt.X("Assists:Q", title="Passes décisives"),
-            tooltip=["Joueur", "Assists"]
-        ).properties(height=520)
-        st.altair_chart(chart, use_container_width=True)
+    st.dataframe(df, use_container_width=True, height=650)
 
+    st.markdown("### Top passeurs")
 
-        #top = df.sort_values(["Assists", "rank"], ascending=[False, True]).head(10).copy()
-        #top = top.iloc[::-1]
-        #top["label"] = top["Assists"].astype(str) + " - " + top["Joueur"]
-        #st.bar_chart(top.set_index("label")["Assists"])
+    chart = alt.Chart(df.head(10)).mark_bar().encode(
+        y=alt.Y("Joueur:N", sort="-x"),
+        x="Passes:Q",
+    )
+    st.altair_chart(chart, use_container_width=True)
 
-
+# ========================
+# CONTRIBUTIONS
+# ========================
 elif page == "Contributions":
-    st.subheader("Contributions (buts + passes)")
+
+    st.subheader("Contributions")
 
     df = load_df(f"""
         SELECT
-          COALESCE(s.player_name, a.player_name) AS "Joueur",
-          COALESCE(s.goals, 0) AS "Buts",
-          COALESCE(a.assists, 0) AS "Assists",
-          (COALESCE(s.goals, 0) + COALESCE(a.assists, 0)) AS "Contributions"
+          COALESCE(s.player_name,a.player_name) AS "Joueur",
+          COALESCE(s.goals,0) AS "Buts",
+          COALESCE(a.assists,0) AS "Passes",
+          (COALESCE(s.goals,0)+COALESCE(a.assists,0)) AS "Contributions"
         FROM scorers s
-        FULL OUTER JOIN assists a
-          ON s.season = a.season AND s.player_name = a.player_name
-        WHERE COALESCE(s.season, a.season) = '{SEASON}'
-        ORDER BY "Contributions" DESC, "Buts" DESC, "Assists" DESC, "Joueur" ASC;
+        FULL JOIN assists a
+        ON s.player_name=a.player_name
+        WHERE COALESCE(s.season,a.season)='{SEASON}'
+        ORDER BY "Contributions" DESC;
     """)
 
-    q = st.text_input("Recherche joueur", "")
-    if q:
-        df = df[df["Joueur"].str.lower().str.contains(q.lower(), na=False)]
+    st.dataframe(df, use_container_width=True, height=650)
 
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.dataframe(df, use_container_width=True, height=650)
-    with col2:
-        st.metric("Joueurs", len(df))
+    st.markdown("### Top contributions")
 
-        st.write("Top 10 (contributions)")
-        top = df.sort_values(["Contributions", "Buts", "Assists"], ascending=[False, False, False]).head(10)
-        chart = alt.Chart(top).mark_bar().encode(
-            y=alt.Y("Joueur:N", sort="-x", title="Joueur"),
-            x=alt.X("Contributions:Q", title="Contributions (buts + passes)"),
-            tooltip=["Joueur", "Contributions", "Buts", "Assists"],
-        ).properties(height=520)
-        st.altair_chart(chart, use_container_width=True)
+    chart = alt.Chart(df.head(10)).mark_bar().encode(
+        y=alt.Y("Joueur:N", sort="-x"),
+        x="Contributions:Q",
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+# ========================
+# GARDIENS
+# ========================
+elif page == "Gardiens 🧤":
+
+    st.subheader("Meilleurs gardiens")
+    st.info("Brancher ici le futur scraper gardiens.")
+
+# ========================
+# PREDICTIONS
+# ========================
+elif page == "Prédictions 🔮":
+
+    st.subheader("Matchs à venir & prédictions")
+    st.info("Brancher ici scraper fixtures + modèle prédictif.")
