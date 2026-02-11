@@ -1,146 +1,106 @@
 import re
 import unicodedata
 from psycopg2.extras import execute_values
-
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
 from scraper.db import get_conn
 from scraper.fetch import fetch_rendered_html
 
 URL = "https://www.footmercato.net/france/ligue-1/buteur"
 SEASON = "2025/2026"
+BASE = "https://www.footmercato.net"
 
-def norm(s: str) -> str:
-    s = s.replace("\xa0", " ")
-    s = unicodedata.normalize("NFKD", s)
-    s = "".join(c for c in s if not unicodedata.combining(c))
-    s = re.sub(r"\s+", " ", s).strip().lower()
-    return s
-
+def clean_player_name(raw_name):
+    """ Enlève les postes (BU, MC...) collés au nom du joueur """
+    postes = ["BU", "AD", "AG", "MC", "MD", "MG", "DG", "DD", "DC", "G", "MIL", "M", "D"]
+    parts = raw_name.split()
+    if not parts:
+        return ""
+    if parts[-1].upper() in postes:
+        parts.pop()
+    return " ".join(parts).strip()
 
 def parse_scorers(html: str):
-    from bs4 import BeautifulSoup
-
     soup = BeautifulSoup(html, "html.parser")
-    raw_text = soup.get_text(" ", strip=True)
-
-    raw_tokens = raw_text.split()
-    tokens = [norm(t) for t in raw_tokens]
-
-    # postes observés (on accepte aussi les codes en MAJUSCULES 1-4 lettres)
-    POS = {"bu", "ad", "ag", "mc", "md", "mg", "dg", "dd", "dc", "g", "mil"}
-
-    def is_int(t: str) -> bool:
-        return t.isdigit()
-
-    def is_float(t: str) -> bool:
-        try:
-            float(t.replace(",", "."))
-            return True
-        except Exception:
-            return False
-
-    def is_pos(tok_raw: str, tok_norm: str) -> bool:
-        if tok_norm in POS:
-            return True
-        return tok_raw.isalpha() and tok_raw.upper() == tok_raw and 1 <= len(tok_raw) <= 4
-
-    # Se placer au début du tableau : après "P. B/M B/90m." ou équivalent
-    start = 0
-    for i in range(len(tokens) - 3):
-        if tokens[i] in {"p.", "p"} and tokens[i + 1] == "b/m" and tokens[i + 2].startswith("b/"):
-            start = i + 3
-            break
-        if tokens[i] == "b/m" and tokens[i + 1].startswith("b/"):
-            start = i + 2
-            break
-
-    if start == 0:
-        for i, t in enumerate(tokens):
-            if t == "buteurs":
-                start = i
-                break
+    table = soup.find("table")
+    if not table:
+        raise RuntimeError("Table des buteurs introuvable.")
 
     rows = []
-    i = start
-    current_rank = 0
-
-    # Lire des entrées jusqu'à un nombre raisonnable
-    while i < len(tokens) and len(rows) < 250:
-        # rang = chiffre ou '-'
-        if tokens[i] == "-" or is_int(tokens[i]):
-            if is_int(tokens[i]):
-                current_rank = int(tokens[i])
-            i += 1
-        else:
-            i += 1
+    for tr in table.find_all("tr")[1:]:
+        tds = tr.find_all("td")
+        if len(tds) < 4:
             continue
 
-        # nom joueur jusqu'à trouver un poste
-        name_start = i
-        while i < len(tokens) and not is_pos(raw_tokens[i], tokens[i]):
-            i += 1
-        if i >= len(tokens):
-            break
+        # 1. Rang
+        rank_txt = tds[0].get_text(strip=True)
+        rank = int(rank_txt) if rank_txt.isdigit() else 0
 
-        player_name = " ".join(raw_tokens[name_start:i]).strip()
-        player_name = player_name.strip("-").strip()
+        # 2. Joueur (Nettoyage + Photo)
+        player_td = tds[1]
+        raw_name = player_td.get_text(" ", strip=True)
+        player_name = clean_player_name(raw_name)
+        
+        photo_url = None
+        img_player = player_td.find("img")
+        if img_player:
+            photo_url = img_player.get("data-src") or img_player.get("src")
+            if photo_url and not photo_url.startswith("http"):
+                photo_url = urljoin(BASE, photo_url)
 
-        # poste (on ne le stocke pas pour l'instant)
-        i += 1
+        # 3. Club (Logo)
+        logo_url = None
+        imgs = tr.find_all("img")
+        if len(imgs) >= 2:
+            src = imgs[1].get("data-src") or imgs[1].get("src")
+            logo_url = urljoin(BASE, src)
 
-        # ensuite : goals (int), penalties (int), bpm (float), b90 (float)
-        if i + 3 >= len(tokens):
-            break
+        # 4. Buts (souvent colonne 3) et Penaltys (colonne 4)
+        try:
+            goals = int(tds[2].get_text(strip=True) or 0)
+            penalties = int(tds[3].get_text(strip=True) or 0)
+        except ValueError:
+            goals, penalties = 0, 0
 
-        if not (is_int(tokens[i]) and is_int(tokens[i + 1]) and is_float(tokens[i + 2]) and is_float(tokens[i + 3])):
-            # si le pattern ne colle pas, on continue la recherche
-            continue
-
-        goals = int(tokens[i])
-        penalties = int(tokens[i + 1])
-        # bpm = float(tokens[i + 2].replace(",", "."))
-        # b90 = float(tokens[i + 3].replace(",", "."))
-        i += 4
-
-        # filtre anti "noms" cassés qui contiennent des chiffres
-        if any(ch.isdigit() for ch in player_name):
-            continue
-        if current_rank <= 0 or not player_name:
-            continue
-
-
-        rows.append(
-            dict(
-                season=SEASON,
-                rank=current_rank,
-                player_name=player_name,
-                team=None,
-                goals=goals,
-                penalties=penalties,
-            )
-        )
-
-    if len(rows) < 10:
-        print("DEBUG: pas assez de buteurs parsés. Tokens (200) autour du start:")
-        print(" ".join(raw_tokens[start : start + 200]))
-        raise RuntimeError("Impossible d'extraire les buteurs (tableau non détecté).")
+        if player_name:
+            rows.append({
+                "season": SEASON,
+                "rank": rank,
+                "player_name": player_name,
+                "team": None,
+                "goals": goals,
+                "penalties": penalties,
+                "photo_url": photo_url,
+                "logo_url": logo_url
+            })
 
     return rows
 
 def upsert_scorers(rows):
+    conn = get_conn()
+    with conn:
+        with conn.cursor() as cur:
+            cur.execute("ALTER TABLE scorers ADD COLUMN IF NOT EXISTS photo_url TEXT;")
+            cur.execute("ALTER TABLE scorers ADD COLUMN IF NOT EXISTS logo_url TEXT;")
+    
     sql = """
-    INSERT INTO scorers (season, rank, player_name, team, goals, penalties)
+    INSERT INTO scorers (season, rank, player_name, team, goals, penalties, photo_url, logo_url)
     VALUES %s
     ON CONFLICT (season, player_name)
     DO UPDATE SET
       rank = EXCLUDED.rank,
-      team = EXCLUDED.team,
       goals = EXCLUDED.goals,
       penalties = EXCLUDED.penalties,
+      photo_url = EXCLUDED.photo_url,
+      logo_url = EXCLUDED.logo_url,
       scraped_at = CURRENT_TIMESTAMP;
     """
-    values = [(r["season"], r["rank"], r["player_name"], r["team"], r["goals"], r["penalties"]) for r in rows]
+    values = [
+        (r["season"], r["rank"], r["player_name"], r["team"], 
+         r["goals"], r["penalties"], r["photo_url"], r["logo_url"]) 
+        for r in rows
+    ]
 
-    conn = get_conn()
     try:
         with conn:
             with conn.cursor() as cur:
@@ -152,7 +112,7 @@ def main():
     html = fetch_rendered_html(URL, wait_text="Buteurs")
     rows = parse_scorers(html)
     upsert_scorers(rows)
-    print(f"OK: {len(rows)} lignes insérées/maj dans scorers.")
+    print(f"✅ OK: {len(rows)} buteurs mis à jour avec images et noms nettoyés.")
 
 if __name__ == "__main__":
     main()
