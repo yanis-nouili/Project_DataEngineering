@@ -90,9 +90,10 @@ def upsert_assists(rows):
     sql = """
     INSERT INTO assists (season, rank, player_name, team, assists, photo_url, logo_url)
     VALUES %s
-    ON CONFLICT (season, player_name, team)
+    ON CONFLICT (season, player_name)
     DO UPDATE SET
       rank = EXCLUDED.rank,
+      team = EXCLUDED.team,
       assists = EXCLUDED.assists,
       photo_url = EXCLUDED.photo_url,
       logo_url = EXCLUDED.logo_url,
