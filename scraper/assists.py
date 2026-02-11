@@ -116,7 +116,7 @@ def main():
     html = fetch_rendered_html(URL, wait_text="Passeurs")
     rows = parse_assists(html)
     upsert_assists(rows)
-    print(f"✅ OK: {len(rows)} passeurs mis à jour (noms nettoyés).")
+    print(f"OK: {len(rows)} passeurs mis à jour (noms nettoyés).")
 
 if __name__ == "__main__":
     main()

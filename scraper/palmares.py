@@ -121,7 +121,7 @@ def save_db(clubs, history):
     conn.close()
 
 if __name__ == "__main__":
-    print("🚀 Scraping des palmarès et des logos...")
+    print("Scraping des palmarès et des logos...")
     c, h = scrape_palmares()
     save_db(c, h)
-    print(f"✅ Terminé ! {len(c)} clubs et {len(h)} saisons avec logos.")
+    print(f"Terminé ! {len(c)} clubs et {len(h)} saisons avec logos.")

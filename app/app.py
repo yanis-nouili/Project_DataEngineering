@@ -152,7 +152,7 @@ elif page == "Classement":
 # ========================
 elif page == "Buteurs":
 
-    st.subheader("⚽ Classement des Buteurs")
+    st.subheader("Classement des Buteurs")
 
     df = load_df(f"""
         SELECT 
@@ -167,7 +167,7 @@ elif page == "Buteurs":
     """)
 
     # Recherche
-    q = st.text_input("🔍 Rechercher un buteur")
+    q = st.text_input("Rechercher un buteur")
     if q:
         df = df[df["Joueur"].str.contains(q, case=False)]
 
@@ -177,8 +177,8 @@ elif page == "Buteurs":
         column_config={
             " ": st.column_config.ImageColumn(" ", width="small"),
             "Club": st.column_config.ImageColumn("Équipe", width="small"),
-            "Buts": st.column_config.NumberColumn("Buts", format="%d ⚽"),
-            "Penaltys": st.column_config.NumberColumn("Pénalty 🥅")
+            "Buts": st.column_config.NumberColumn("Buts", format="%d "),
+            "Penaltys": st.column_config.NumberColumn("Pénalty ")
         },
         use_container_width=True, 
         height=650,
@@ -198,7 +198,7 @@ elif page == "Buteurs":
 # ========================
 elif page == "Passeurs":
 
-    st.subheader("🎯 Classement des Passeurs")
+    st.subheader("Classement des Passeurs")
 
     df = load_df(f"""
         SELECT 
@@ -212,7 +212,7 @@ elif page == "Passeurs":
     """)
 
     # Recherche
-    q = st.text_input("🔍 Rechercher un joueur")
+    q = st.text_input("Rechercher un joueur")
     if q:
         df = df[df["Joueur"].str.contains(q, case=False)]
 
@@ -222,7 +222,7 @@ elif page == "Passeurs":
         column_config={
             " ": st.column_config.ImageColumn(" ", width="small"),
             "Club": st.column_config.ImageColumn("Club", width="small"),
-            "Passes": st.column_config.NumberColumn("Passes", format="%d 🎯")
+            "Passes": st.column_config.NumberColumn("Passes", format="%d")
         },
         use_container_width=True, 
         height=650,
@@ -234,7 +234,7 @@ elif page == "Passeurs":
 # ========================
 elif page == "Contributions":
 
-    st.subheader("Contributions")
+    st.subheader("Contributions (Buts + Passes décisives)")
 
     df = load_df(f"""
         SELECT
@@ -275,18 +275,18 @@ elif page == "Palmarès":
     # 2. HISTORIQUE
     history = load_df("""
         SELECT season AS "Saison", 
-               winner_logo AS " ", winner AS "Champion", 
-               runner_up_logo AS "  ", runner_up AS "Finaliste"
+               winner_logo AS " ", winner AS "Vainqueurs", 
+               runner_up_logo AS "  ", runner_up AS "Dauphins"
         FROM palmares_history ORDER BY season DESC;
     """)
 
     st.markdown("### Clubs les plus titrés")
     st.dataframe(clubs, column_config={
         "Logo": st.column_config.ImageColumn("Logo", width="small"),
-        "Titres": st.column_config.NumberColumn("Titres", format="%d 🏆")
+        "Titres": st.column_config.NumberColumn("Titres", format="%d")
     }, use_container_width=True, hide_index=True)
 
-    st.markdown("### Historique des saisons")
+    st.markdown("### Historique vainqueurs de chaque saison")
     st.dataframe(history, column_config={
         " ": st.column_config.ImageColumn(" ", width="small"),
         "  ": st.column_config.ImageColumn("  ", width="small")
