@@ -137,7 +137,7 @@ def upsert_assists(rows):
     sql = """
     INSERT INTO assists (season, rank, player_name, team, assists)
     VALUES %s
-    ON CONFLICT (season, player_name)
+    ON CONFLICT (season, player_name, team)
     DO UPDATE SET
       rank = EXCLUDED.rank,
       team = EXCLUDED.team,
@@ -153,6 +153,7 @@ def upsert_assists(rows):
                 execute_values(cur, sql, values)
     finally:
         conn.close()
+
 
 def main():
     html = fetch_rendered_html(URL, wait_text="Passeurs")
