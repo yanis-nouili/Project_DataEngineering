@@ -152,30 +152,44 @@ elif page == "Classement":
 # ========================
 elif page == "Buteurs":
 
-    st.subheader("Buteurs")
+    st.subheader("⚽ Classement des Buteurs")
 
     df = load_df(f"""
-        SELECT rank, player_name AS "Joueur",
-               goals AS "Buts",
-               penalties AS "Pénaltys"
+        SELECT 
+            photo_url AS " ",
+            player_name AS "Joueur",
+            logo_url AS "Club",
+            goals AS "Buts",
+            penalties AS "Penaltys"
         FROM scorers
         WHERE season='{SEASON}'
-        ORDER BY goals DESC;
+        ORDER BY goals DESC, rank ASC;
     """)
 
-    q = st.text_input("Recherche joueur")
+    # Recherche
+    q = st.text_input("🔍 Rechercher un buteur")
     if q:
         df = df[df["Joueur"].str.contains(q, case=False)]
 
-    st.dataframe(df, use_container_width=True, height=650)
+    # Affichage avec images
+    st.dataframe(
+        df, 
+        column_config={
+            " ": st.column_config.ImageColumn(" ", width="small"),
+            "Club": st.column_config.ImageColumn("Équipe", width="small"),
+            "Buts": st.column_config.NumberColumn("Buts", format="%d ⚽"),
+            "Penaltys": st.column_config.NumberColumn("Pénalty 🥅")
+        },
+        use_container_width=True, 
+        height=650,
+        hide_index=True
+    )
 
-    st.markdown("### Top buteurs")
-
-    top = df.head(10)
-
-    chart = alt.Chart(top).mark_bar().encode(
+    st.markdown("### Top 10 des buteurs")
+    chart = alt.Chart(df.head(10)).mark_bar().encode(
         y=alt.Y("Joueur:N", sort="-x"),
         x="Buts:Q",
+        color=alt.value("#e74c3c")
     )
     st.altair_chart(chart, use_container_width=True)
 
@@ -184,29 +198,36 @@ elif page == "Buteurs":
 # ========================
 elif page == "Passeurs":
 
-    st.subheader("Passeurs")
+    st.subheader("🎯 Classement des Passeurs")
 
     df = load_df(f"""
-        SELECT rank, player_name AS "Joueur",
-               assists AS "Passes"
+        SELECT 
+            photo_url AS " ",
+            player_name AS "Joueur",
+            logo_url AS "Club",
+            assists AS "Passes"
         FROM assists
         WHERE season='{SEASON}'
-        ORDER BY assists DESC;
+        ORDER BY assists DESC, rank ASC;
     """)
 
-    q = st.text_input("Recherche joueur")
+    # Recherche
+    q = st.text_input("🔍 Rechercher un joueur")
     if q:
         df = df[df["Joueur"].str.contains(q, case=False)]
 
-    st.dataframe(df, use_container_width=True, height=650)
-
-    st.markdown("### Top passeurs")
-
-    chart = alt.Chart(df.head(10)).mark_bar().encode(
-        y=alt.Y("Joueur:N", sort="-x"),
-        x="Passes:Q",
+    # Affichage
+    st.dataframe(
+        df, 
+        column_config={
+            " ": st.column_config.ImageColumn(" ", width="small"),
+            "Club": st.column_config.ImageColumn("Club", width="small"),
+            "Passes": st.column_config.NumberColumn("Passes", format="%d 🎯")
+        },
+        use_container_width=True, 
+        height=650,
+        hide_index=True
     )
-    st.altair_chart(chart, use_container_width=True)
 
 # ========================
 # CONTRIBUTIONS
