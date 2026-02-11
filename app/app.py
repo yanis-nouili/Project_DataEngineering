@@ -55,8 +55,7 @@ page = st.sidebar.radio(
         "Buteurs",
         "Passeurs",
         "Contributions",
-        "Gardiens 🧤",
-        "Prédictions 🔮",
+        "Palmarès",
     ],
 )
 
@@ -238,19 +237,36 @@ elif page == "Contributions":
         x="Contributions:Q",
     )
     st.altair_chart(chart, use_container_width=True)
+    
 
 # ========================
-# GARDIENS
+# PALMARES 
 # ========================
-elif page == "Gardiens 🧤":
+elif page == "Palmarès":
+    st.subheader("Palmarès Ligue 1")
 
-    st.subheader("Meilleurs gardiens")
-    st.info("Brancher ici le futur scraper gardiens.")
+    # 1. TOP CLUBS
+    clubs = load_df("""
+        SELECT logo_url AS "Logo", team AS "Equipe", titles AS "Titres"
+        FROM palmares_clubs WHERE titles < 30 ORDER BY titles DESC;
+    """)
 
-# ========================
-# PREDICTIONS
-# ========================
-elif page == "Prédictions 🔮":
+    # 2. HISTORIQUE
+    history = load_df("""
+        SELECT season AS "Saison", 
+               winner_logo AS " ", winner AS "Champion", 
+               runner_up_logo AS "  ", runner_up AS "Finaliste"
+        FROM palmares_history ORDER BY season DESC;
+    """)
 
-    st.subheader("Matchs à venir & prédictions")
-    st.info("Brancher ici scraper fixtures + modèle prédictif.")
+    st.markdown("### Clubs les plus titrés")
+    st.dataframe(clubs, column_config={
+        "Logo": st.column_config.ImageColumn("Logo", width="small"),
+        "Titres": st.column_config.NumberColumn("Titres", format="%d 🏆")
+    }, use_container_width=True, hide_index=True)
+
+    st.markdown("### Historique des saisons")
+    st.dataframe(history, column_config={
+        " ": st.column_config.ImageColumn(" ", width="small"),
+        "  ": st.column_config.ImageColumn("  ", width="small")
+    }, use_container_width=True, hide_index=True)
