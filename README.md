@@ -12,7 +12,7 @@ Ce projet est une application web interactive permettant de suivre les statistiq
 
 ---
 
-## 🛠 Stack Technique
+## Stack Technique
 * **Langage** : `Python 3.12`
 * **Scraping** : 
     * `Playwright` : Pour gérer le rendu JavaScript dynamique (essentiel pour Foot Mercato).
