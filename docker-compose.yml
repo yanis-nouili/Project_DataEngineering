@@ -26,9 +26,10 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       SEASON: "2025/2026"
+      SCRAPE_ON_START: "1"
     volumes:
       - .:/app   # permet de modifier le code sans rebuild
-    command: streamlit run app/app.py --server.port=8501 --server.address=0.0.0.0
+    #command: streamlit run app/app.py --server.port=8501 --server.address=0.0.0.0
 
 volumes:
   postgres_data:
