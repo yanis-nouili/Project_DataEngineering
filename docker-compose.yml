@@ -2,17 +2,32 @@ services:
   db:
     image: postgres:16
     container_name: ligue1_postgres
-    env_file: .env
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ligue1
+      POSTGRES_USER: yanis
+      POSTGRES_PASSWORD: yanis123
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    restart: unless-stopped
+
+  web:
+    build: .
+    container_name: ligue1_web
+    depends_on:
+      - db
+    ports:
+      - "8501:8501"
+    environment:
+      POSTGRES_DB: ligue1
+      POSTGRES_USER: yanis
+      POSTGRES_PASSWORD: yanis123
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      SEASON: "2025/2026"
+    volumes:
+      - .:/app   # permet de modifier le code sans rebuild
+    command: streamlit run app/app.py --server.port=8501 --server.address=0.0.0.0
 
 volumes:
   postgres_data:
