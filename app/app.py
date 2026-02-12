@@ -30,7 +30,7 @@ def get_conn():
         dbname=os.environ["POSTGRES_DB"],
         user=os.environ["POSTGRES_USER"],
         password=os.environ["POSTGRES_PASSWORD"],
-        host=os.environ.get("POSTGRES_HOST", "localhost"),
+        host=os.environ.get("POSTGRES_HOST", "db"), # "db" pour docker, "localhost" en local
         port=int(os.environ.get("POSTGRES_PORT", "5432")),
     )
 
@@ -49,216 +49,135 @@ st.title("Ligue 1 — Dashboard")
 
 page = st.sidebar.radio(
     "Navigation",
-    [
-        "Accueil",
-        "Classement",
-        "Buteurs",
-        "Passeurs",
-        "Contributions",
-        "Palmarès",
-    ],
+    ["Accueil", 
+    "Classement", 
+    "Buteurs",
+    "Passeurs", 
+    "Contributions", 
+    "Palmarès"]
 )
 
 # ========================
 # ACCUEIL
 # ========================
 if page == "Accueil":
-
     st.subheader("Aperçu Ligue 1")
 
-    standings = load_df(f"""
-        SELECT team, points
-        FROM standings
-        WHERE season='{SEASON}'
-        ORDER BY rank LIMIT 1;
-    """)
-
-    scorers = load_df(f"""
-        SELECT player_name, goals
-        FROM scorers
-        WHERE season='{SEASON}'
-        ORDER BY goals DESC LIMIT 1;
-    """)
-
-    assists = load_df(f"""
-        SELECT player_name, assists
-        FROM assists
-        WHERE season='{SEASON}'
-        ORDER BY assists DESC LIMIT 1;
-    """)
+    standings = load_df(f"SELECT team, points FROM standings WHERE season='{SEASON}' ORDER BY rank LIMIT 1;")
+    scorers = load_df(f"SELECT player_name, goals FROM scorers WHERE season='{SEASON}' ORDER BY goals DESC LIMIT 1;")
+    assists = load_df(f"SELECT player_name, assists FROM assists WHERE season='{SEASON}' ORDER BY assists DESC LIMIT 1;")
 
     k1, k2, k3 = st.columns(3)
-
-    if len(standings):
-        k1.metric("Leader", standings.iloc[0]["team"],
-                  f"{int(standings.iloc[0]['points'])} pts")
-
-    if len(scorers):
-        k2.metric("Meilleur buteur",
-                  scorers.iloc[0]["player_name"],
-                  f"{int(scorers.iloc[0]['goals'])} buts")
-
-    if len(assists):
-        k3.metric("Meilleur passeur",
-                  assists.iloc[0]["player_name"],
-                  f"{int(assists.iloc[0]['assists'])} passes")
+    if not standings.empty:
+        k1.metric("Leader", standings.iloc[0]["team"], f"{int(standings.iloc[0]['points'])} pts")
+    if not scorers.empty:
+        k2.metric("Meilleur buteur", scorers.iloc[0]["player_name"], f"{int(scorers.iloc[0]['goals'])} buts")
+    if not assists.empty:
+        k3.metric("Meilleur passeur", assists.iloc[0]["player_name"], f"{int(assists.iloc[0]['assists'])} passes")
 
 # ========================
 # CLASSEMENT
 # ========================
 elif page == "Classement":
-
-    st.subheader("Classement")
-
+    st.subheader(f"Classement Ligue 1 - Saison {SEASON}")
     df = load_df(f"""
-        SELECT
-            rank,
-            logo_url AS "Logo",
-            team AS "Equipe",
-            played AS "Matchs",
-            wins AS "Victoires",
-            draws AS "Nuls",
-            losses AS "Défaites",
-            goals_for AS "BP",
-            goals_against AS "BC",
-            goal_diff AS "Diff",
-            points AS "Points"
-        FROM standings
-        WHERE season='{SEASON}'
-        ORDER BY rank;
+        SELECT 
+            rank AS "Rang", 
+            logo_url AS " ", 
+            team AS "Équipe", 
+            played AS "J", 
+            wins AS "G", 
+            draws AS "N", 
+            losses AS "P", 
+            goal_diff AS "Diff", 
+            points AS "Pts"
+        FROM standings WHERE season='{SEASON}' ORDER BY rank ASC;
     """)
-
-    st.dataframe(
-        df,
-        use_container_width=True,
-        height=650,
-        column_config={
-            "Logo": st.column_config.ImageColumn(width="small")
-        },
-    )
-
-    st.markdown("### Top 6 équipes (points)")
-
-    if len(df) >= 6:
-        top6 = df.head(6)
-        chart = alt.Chart(top6).mark_bar().encode(
-            y=alt.Y("Equipe:N", sort="-x"),
-            x="Points:Q",
-        )
-        st.altair_chart(chart, use_container_width=True)
+    st.dataframe(df, column_config={
+        " ": st.column_config.ImageColumn(" ", width="small"),
+        "Pts": st.column_config.NumberColumn("Pts", format="%d")
+    }, use_container_width=True, hide_index=True)
 
 # ========================
 # BUTEURS
 # ========================
 elif page == "Buteurs":
-
     st.subheader("Classement des Buteurs")
-
     df = load_df(f"""
         SELECT 
-            photo_url AS " ",
-            player_name AS "Joueur",
-            logo_url AS "Club",
-            goals AS "Buts",
+            photo_url AS " ", 
+            player_name AS "Joueur", 
+            logo_url AS "Club", 
+            goals AS "Buts", 
             penalties AS "Penaltys"
-        FROM scorers
-        WHERE season='{SEASON}'
-        ORDER BY goals DESC, rank ASC;
+        FROM scorers WHERE season='{SEASON}' ORDER BY goals DESC, rank ASC;
     """)
-
-    # Recherche
     q = st.text_input("Rechercher un buteur")
-    if q:
-        df = df[df["Joueur"].str.contains(q, case=False)]
+    if q: df = df[df["Joueur"].str.contains(q, case=False)]
 
-    # Affichage avec images
-    st.dataframe(
-        df, 
-        column_config={
-            " ": st.column_config.ImageColumn(" ", width="small"),
-            "Club": st.column_config.ImageColumn("Équipe", width="small"),
-            "Buts": st.column_config.NumberColumn("Buts", format="%d "),
-            "Penaltys": st.column_config.NumberColumn("Pénalty ")
-        },
-        use_container_width=True, 
-        height=650,
-        hide_index=True
-    )
-
-    st.markdown("### Top 10 des buteurs")
-    chart = alt.Chart(df.head(10)).mark_bar().encode(
-        y=alt.Y("Joueur:N", sort="-x"),
-        x="Buts:Q",
-        color=alt.value("#e74c3c")
-    )
-    st.altair_chart(chart, use_container_width=True)
+    st.dataframe(df, column_config={
+        " ": st.column_config.ImageColumn(" ", width="small"),
+        "Club": st.column_config.ImageColumn("Équipe", width="small")
+    }, use_container_width=True, height=650, hide_index=True)
 
 # ========================
 # PASSEURS
 # ========================
 elif page == "Passeurs":
-
     st.subheader("Classement des Passeurs")
-
     df = load_df(f"""
         SELECT 
-            photo_url AS " ",
-            player_name AS "Joueur",
-            logo_url AS "Club",
+            photo_url AS " ", 
+            player_name AS "Joueur", 
+            logo_url AS "Club", 
             assists AS "Passes"
-        FROM assists
-        WHERE season='{SEASON}'
-        ORDER BY assists DESC, rank ASC;
+        FROM assists WHERE season='{SEASON}' ORDER BY assists DESC, rank ASC;
     """)
-
-    # Recherche
     q = st.text_input("Rechercher un joueur")
-    if q:
-        df = df[df["Joueur"].str.contains(q, case=False)]
+    if q: df = df[df["Joueur"].str.contains(q, case=False)]
 
-    # Affichage
-    st.dataframe(
-        df, 
-        column_config={
-            " ": st.column_config.ImageColumn(" ", width="small"),
-            "Club": st.column_config.ImageColumn("Club", width="small"),
-            "Passes": st.column_config.NumberColumn("Passes", format="%d")
-        },
-        use_container_width=True, 
-        height=650,
-        hide_index=True
-    )
+    st.dataframe(df, column_config={
+        " ": st.column_config.ImageColumn(" ", width="small"),
+        "Club": st.column_config.ImageColumn("Club", width="small")
+    }, use_container_width=True, height=650, hide_index=True)
 
 # ========================
 # CONTRIBUTIONS
 # ========================
 elif page == "Contributions":
-
-    st.subheader("Contributions (Buts + Passes décisives)")
-
+    st.subheader("Contributions Combinées (Buts + Passes)")
     df = load_df(f"""
-        SELECT
-          COALESCE(s.player_name,a.player_name) AS "Joueur",
-          COALESCE(s.goals,0) AS "Buts",
-          COALESCE(a.assists,0) AS "Passes",
-          (COALESCE(s.goals,0)+COALESCE(a.assists,0)) AS "Contributions"
-        FROM scorers s
-        FULL JOIN assists a
-        ON s.player_name=a.player_name
-        WHERE COALESCE(s.season,a.season)='{SEASON}'
-        ORDER BY "Contributions" DESC;
+        SELECT 
+            photo_url AS " ",
+            player_name AS "Joueur", 
+            logo_url AS "Équipe",
+            SUM(goals) AS "Buts", 
+            SUM(assists) AS "Passes",
+            (SUM(goals) + SUM(assists)) AS "Total"
+        FROM (
+            SELECT 
+                player_name, 
+                goals, 
+                0 AS assists, 
+                photo_url, 
+                logo_url FROM scorers WHERE season='{SEASON}'
+                UNION ALL
+            SELECT 
+                player_name, 
+                0 AS goals, 
+                assists, 
+                photo_url, 
+                logo_url FROM assists WHERE season='{SEASON}'
+        ) AS combined
+        GROUP BY player_name, photo_url, logo_url
+        ORDER BY "Total" DESC;
     """)
 
-    st.dataframe(df, use_container_width=True, height=650)
-
-    st.markdown("### Top contributions")
-
-    chart = alt.Chart(df.head(10)).mark_bar().encode(
-        y=alt.Y("Joueur:N", sort="-x"),
-        x="Contributions:Q",
-    )
-    st.altair_chart(chart, use_container_width=True)
-    
+    st.dataframe(df, column_config={
+        " ": st.column_config.ImageColumn(" ", width="small"),
+        "Équipe": st.column_config.ImageColumn("Équipe", width="small"),
+        "Total": st.column_config.NumberColumn("Total", format="%d")
+    }, use_container_width=True, height=650, hide_index=True)
 
 # ========================
 # PALMARES 
@@ -266,18 +185,25 @@ elif page == "Contributions":
 elif page == "Palmarès":
     st.subheader("Palmarès Ligue 1")
 
-    # 1. TOP CLUBS
+    # 1. TOP CLUBS - Correction des guillemets simples en doubles guillemets pour les alias
     clubs = load_df("""
-        SELECT logo_url AS "Logo", team AS "Equipe", titles AS "Titres"
-        FROM palmares_clubs WHERE titles < 30 ORDER BY titles DESC;
+        SELECT 
+            logo_url AS "Logo", 
+            team AS "Equipe", titles AS "Titres" 
+        FROM palmares_clubs 
+        WHERE titles < 30 
+        ORDER BY titles DESC;
     """)
 
     # 2. HISTORIQUE
     history = load_df("""
         SELECT season AS "Saison", 
-               winner_logo AS " ", winner AS "Vainqueurs", 
-               runner_up_logo AS "  ", runner_up AS "Dauphins"
-        FROM palmares_history ORDER BY season DESC;
+               winner_logo AS " ", 
+                winner AS "Vainqueurs", 
+               runner_up_logo AS "  ", 
+                runner_up AS "Dauphins"
+        FROM palmares_history 
+        ORDER BY season DESC;
     """)
 
     st.markdown("### Clubs les plus titrés")
