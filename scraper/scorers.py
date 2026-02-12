@@ -112,7 +112,7 @@ def main():
     html = fetch_rendered_html(URL, wait_text="Buteurs")
     rows = parse_scorers(html)
     upsert_scorers(rows)
-    print(f"✅ OK: {len(rows)} buteurs mis à jour avec images et noms nettoyés.")
+    print(f"OK: {len(rows)} buteurs mis à jour avec images et noms nettoyés.")
 
 if __name__ == "__main__":
     main()

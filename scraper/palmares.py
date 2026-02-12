@@ -120,8 +120,11 @@ def save_db(clubs, history):
                 """, (season, w_name, w_logo, r_name, r_logo))
     conn.close()
 
-if __name__ == "__main__":
+def main():
     print("Scraping des palmarès et des logos...")
     c, h = scrape_palmares()
     save_db(c, h)
     print(f"Terminé ! {len(c)} clubs et {len(h)} saisons avec logos.")
+
+if __name__ == "__main__":
+    main()
