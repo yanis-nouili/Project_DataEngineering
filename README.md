@@ -43,7 +43,7 @@ Ce projet est une application web interactive permettant de suivre les statistiq
 
 ---
 
-## 🏗 Architecture & Choix Techniques
+## Architecture & Choix Techniques
 
 ### Stratégie de Scraping
 Nous utilisons **Playwright** en mode *headless*. Ce choix est dicté par la nature du site source (Foot Mercato), qui utilise du chargement asynchrone pour ses tableaux. 
