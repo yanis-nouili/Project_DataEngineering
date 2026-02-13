@@ -11,7 +11,7 @@ SEASON = "2025/2026"
 BASE = "https://www.footmercato.net"
 
 def clean_player_name(raw_name):
-    """ Enlève les postes (BU, MC...) collés au nom du joueur """
+    """Retire les codes de poste (BU, MC...) parfois collés au nom sur le site."""
     postes = ["BU", "AD", "AG", "MC", "MD", "MG", "DG", "DD", "DC", "G", "MIL", "M", "D"]
     parts = raw_name.split()
     if not parts:
@@ -26,17 +26,18 @@ def parse_scorers(html: str):
     if not table:
         raise RuntimeError("Table des buteurs introuvable.")
 
+    # On parcourt les lignes de données
     rows = []
     for tr in table.find_all("tr")[1:]:
         tds = tr.find_all("td")
         if len(tds) < 4:
             continue
 
-        # 1. Rang
+        # Rang
         rank_txt = tds[0].get_text(strip=True)
         rank = int(rank_txt) if rank_txt.isdigit() else 0
 
-        # 2. Joueur (Nettoyage + Photo)
+        # Joueur (Nettoyage + Photo)
         player_td = tds[1]
         raw_name = player_td.get_text(" ", strip=True)
         player_name = clean_player_name(raw_name)
@@ -48,14 +49,14 @@ def parse_scorers(html: str):
             if photo_url and not photo_url.startswith("http"):
                 photo_url = urljoin(BASE, photo_url)
 
-        # 3. Club (Logo)
+        # Club (Logo), aussi la 2e image de la ligne est en général le logo du club
         logo_url = None
         imgs = tr.find_all("img")
         if len(imgs) >= 2:
             src = imgs[1].get("data-src") or imgs[1].get("src")
             logo_url = urljoin(BASE, src)
 
-        # 4. Buts (souvent colonne 3) et Penaltys (colonne 4)
+        # Buts en colonne 2 et Penaltys en colonne 3 
         try:
             goals = int(tds[2].get_text(strip=True) or 0)
             penalties = int(tds[3].get_text(strip=True) or 0)

@@ -42,14 +42,14 @@ def parse_assists(html: str):
         if len(tds) < 3:
             continue
 
-        # 1. Rang
+        # Rang
         rank_txt = tds[0].get_text(strip=True)
         rank = int(rank_txt) if rank_txt.isdigit() else 0
 
-        # 2. Joueur (Nettoyage du nom + Photo)
+        # Joueur (Nettoyage du nom + Photo)
         player_td = tds[1]
         raw_name = player_td.get_text(" ", strip=True)
-        player_name = clean_player_name(raw_name) # Nettoyage ici
+        player_name = clean_player_name(raw_name) 
         
         photo_url = None
         img_player = player_td.find("img")
@@ -58,16 +58,16 @@ def parse_assists(html: str):
             if photo_url and not photo_url.startswith("http"):
                 photo_url = urljoin(BASE, photo_url)
 
-        # 3. Club (Logo)
+        # Club (Logo)
         logo_url = None
         imgs = tr.find_all("img")
         if len(imgs) >= 2:
             src = imgs[1].get("data-src") or imgs[1].get("src")
             logo_url = urljoin(BASE, src)
 
-        # 4. Passes
+        # Passes
         assists_val = 0
-        for td in tds[2:]:
+        for td in tds[2:]: # La colonne passes peut bouger, on prend le premier entier trouvé après le joueur
             txt = td.get_text(strip=True)
             if txt.isdigit():
                 assists_val = int(txt)
@@ -113,7 +113,7 @@ def upsert_assists(rows):
         conn.close()
 
 def main():
-    html = fetch_rendered_html(URL, wait_text="Passeurs")
+    html = fetch_rendered_html(URL, wait_text="Passeurs") # évite de parser trop tôt si la page n'a pas fini de charger
     rows = parse_assists(html)
     upsert_assists(rows)
     print(f"OK: {len(rows)} passeurs mis à jour (noms nettoyés).")
