@@ -55,7 +55,7 @@ Les données sont scrapées depuis le site web Foot Mercato :
 
 ### Stratégie de Scraping
 Nous utilisons Playwright en mode headless. Ce choix est dû à la nature du site source, qui utilise du chargement asynchrone pour ses tableaux. 
-Les scrapers sont orchestrés par `scraper/run_all.py` et lancés automatiquement au démarrage du conteneur via un script `entrypoint.sh` qui s'assure que la base de données est prête avant de commencer.
+Les scrapers sont orchestrés par `scraper/run_all.py` et lancés automatiquement au démarrage du conteneur via un script `entrypoint.sh` qui s'assure que la base de données est prête avant de commencer. Le premier lancement peut prendre environ 20 secondes, puis les tableaux se remplissent.
 
 
 
@@ -87,7 +87,6 @@ Project_DataEngineering/
 ├── sql/
 │   └── schema.sql          # Création des tables (utilisé par Docker)
 ├── .dockerignore           # Pour ne pas copier les fichiers inutiles
-├── .env                    # Tes variables secrètes (MDP, DB)
 ├── .gitignore              # Pour ne pas envoyer .env sur GitHub
 ├── docker-compose.yml      # Orchestration des services
 ├── Dockerfile              # Instructions de build
