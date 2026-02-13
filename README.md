@@ -103,6 +103,7 @@ Project_DataEngineering/
 ├── entrypoint.sh           # Script de démarrage
 ├── requirements.txt        # Liste des bibliothèques Python
 └── README.md               # Documentation
+```
 
 ---
 
