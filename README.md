@@ -9,7 +9,7 @@ Ce projet est une application web interactive permettant de suivre les statistiq
 * **Contributions** : Vues agrégées
 * **Palmarès Historique** : Liste des clubs les plus titrés et historique des vainqueurs par saison.
 * **Moteur de Recherche** : Recherche globale de joueurs à travers toutes les statistiques.
-* **Graphique** : Analyse *Points vs Différence de buts* (Top 10) sur la page Classement
+* **Graphique** : Diagramme en barres (Différence de buts, Top 10) sur la page Classement avec tri Diff / Classement
 
 ---
 
@@ -103,3 +103,9 @@ Project_DataEngineering/
 ├── entrypoint.sh           # Script de démarrage
 ├── requirements.txt        # Liste des bibliothèques Python
 └── README.md               # Documentation
+
+---
+
+## Auteurs
+Projet réalisé en binôme par **Yanis NOUILI** et **Yacine OUALIKEN**.
+
