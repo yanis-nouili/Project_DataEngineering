@@ -193,6 +193,9 @@ elif page == "Contributions":
         GROUP BY player_name, photo_url, logo_url
         ORDER BY "Total" DESC;
     """)
+    
+    q = st.text_input("Rechercher un joueur")
+    if q: df = df[df["Joueur"].str.contains(q, case=False)]
 
     st.dataframe(df, column_config={
         " ": st.column_config.ImageColumn(" ", width="small"),
