@@ -92,7 +92,7 @@ elif page == "Classement":
     st.dataframe(df, column_config={
         " ": st.column_config.ImageColumn(" ", width="small"),
         "Pts": st.column_config.NumberColumn("Pts", format="%d")
-    }, use_container_width=True, hide_index=True)
+    }, use_container_width=True,height=650, hide_index=True)
 
 # BUTEURS
 
