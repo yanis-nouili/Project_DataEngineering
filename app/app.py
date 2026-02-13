@@ -94,34 +94,33 @@ elif page == "Classement":
         "Pts": st.column_config.NumberColumn("Pts", format="%d")
     }, use_container_width=True,height=520, hide_index=True)
     
-    st.subheader("Analyse : Points vs Différence de buts (Top 10)")
+    st.subheader("Différence de buts par équipe (Top 10 du classement)")
 
-    chart_df = df.copy()
+    bar_df = df.copy().sort_values("Pts", ascending=False).head(10)
     
-    chart_df = chart_df.sort_values("Pts", ascending=False).head(10)
-    chart_df = chart_df[chart_df["Équipe"] != "Toulouse"]
+    tri = st.radio("Trier le graphique par", ["Différence de buts", "Classement"], horizontal=True)
+
+    if tri == "Classement":
+        bar_df = bar_df.sort_values("Rang")
+    else:
+        bar_df = bar_df.sort_values(["Diff", "Rang"], ascending=[False, True])
+
+    order_teams = bar_df["Équipe"].tolist()
     chart = (
-        alt.Chart(chart_df)
-        .mark_circle(size=120)
+        alt.Chart(bar_df)
+        .mark_bar()
         .encode(
+            y=alt.Y("Équipe:N", sort=order_teams, title="Équipe"), 
             x=alt.X("Diff:Q", title="Différence de buts"),
-            y=alt.Y("Pts:Q", title="Points"),
-            tooltip=["Équipe", "Pts", "Diff", "J"],
+            tooltip=["Équipe","Rang", "Pts", "Diff", "J"],         
         )
-        .properties(height=280)
+        .properties(height=320)
+        .configure_view(strokeWidth=0)
+        .configure_axis(gridOpacity=0.2)
     )
-    labels = (
-        alt.Chart(chart_df)
-        .mark_text(align="left", dx=7, dy=-7)
-        .encode(
-            x="Diff:Q",
-            y="Pts:Q",
-            text="Équipe:N"
-        )
-    )
-    trend = chart.transform_regression("Diff", "Pts").mark_line()
-    st.altair_chart((chart + labels).interactive(), use_container_width=True)
-    
+
+    st.altair_chart(chart, use_container_width=True)
+
 # BUTEURS
 
 elif page == "Buteurs":
