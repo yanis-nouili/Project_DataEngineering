@@ -21,6 +21,7 @@ def get_conn():
     )
 
 def scrape_palmares():
+    # La page palmarès est statique pas besoin de Playwright
     r = requests.get(URL)
     r.encoding = r.apparent_encoding 
     soup = BeautifulSoup(r.text, "html.parser")
@@ -28,9 +29,7 @@ def scrape_palmares():
     clubs = []
     history = []
 
-    # ======================
-    # 1. TOP CLUBS (Avec Logos)
-    # ======================
+    # Top clubs
     for block in soup.find_all("div"):
         text = block.get_text(" ", strip=True)
         if text and any(char.isdigit() for char in text):
@@ -62,9 +61,7 @@ def scrape_palmares():
                 except ValueError:
                     continue
 
-    # ======================
-    # 2. HISTORIQUE (Avec Logos Champion/Finaliste)
-    # ======================
+    # HISTORIQUE (Champion/Finaliste)
     table = soup.find("table")
     if table:
         for row in table.find_all("tr")[1:]:
@@ -72,7 +69,7 @@ def scrape_palmares():
             if len(cols) >= 3:
                 season = cols[0].text.strip()
                 
-                # Extraction Champion + Logo
+                # Extraction champion + logo
                 winner_name = cols[1].text.strip()
                 winner_logo = None
                 img_w = cols[1].find("img")
@@ -80,7 +77,7 @@ def scrape_palmares():
                     src_w = img_w.get("data-src") or img_w.get("src")
                     if src_w: winner_logo = urljoin(BASE, src_w)
 
-                # Extraction Finaliste + Logo
+                # Extraction finaliste + logo
                 runner_name = cols[2].text.strip()
                 runner_logo = None
                 img_r = cols[2].find("img")

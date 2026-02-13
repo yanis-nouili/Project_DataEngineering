@@ -7,7 +7,7 @@ from scraper.palmares import main as palmares_main
 
 
 def main():
-    print("Run all scrapers...")
+    print("Run all scrapers (standings, scorers, assists, palmares)...")
     standings_main()
     scorers_main()
     assists_main()
