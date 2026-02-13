@@ -9,9 +9,9 @@ load_dotenv()
 
 st.set_page_config(page_title="Ligue 1 Dashboard", layout="wide")
 
-# ========================
+
 # CSS
-# ========================
+
 def load_css():
     css_path = os.path.join(os.path.dirname(__file__), "style.css")
     if os.path.exists(css_path):
@@ -22,19 +22,18 @@ load_css()
 
 SEASON = os.environ.get("SEASON", "2025/2026")
 
-# ========================
 # DB
-# ========================
+
 def get_conn():
     return psycopg2.connect(
         dbname=os.environ["POSTGRES_DB"],
         user=os.environ["POSTGRES_USER"],
         password=os.environ["POSTGRES_PASSWORD"],
-        host=os.environ.get("POSTGRES_HOST", "db"), # "db" pour docker, "localhost" en local
+        host=os.environ.get("POSTGRES_HOST", "db"), # "db" dans docker-compose, sinon "localhost" en local
         port=int(os.environ.get("POSTGRES_PORT", "5432")),
     )
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=60) # cela évite de taper la DB à chaque interaction
 def load_df(query: str):
     conn = get_conn()
     try:
@@ -42,9 +41,8 @@ def load_df(query: str):
     finally:
         conn.close()
 
-# ========================
 # NAVIGATION
-# ========================
+
 st.title("Ligue 1 — Dashboard")
 
 page = st.sidebar.radio(
@@ -57,9 +55,8 @@ page = st.sidebar.radio(
     "Palmarès"]
 )
 
-# ========================
 # ACCUEIL
-# ========================
+
 if page == "Accueil":
     st.subheader("Aperçu Ligue 1")
 
@@ -75,9 +72,8 @@ if page == "Accueil":
     if not assists.empty:
         k3.metric("Meilleur passeur", assists.iloc[0]["player_name"], f"{int(assists.iloc[0]['assists'])} passes")
 
-# ========================
 # CLASSEMENT
-# ========================
+
 elif page == "Classement":
     st.subheader(f"Classement Ligue 1 - Saison {SEASON}")
     df = load_df(f"""
@@ -98,9 +94,8 @@ elif page == "Classement":
         "Pts": st.column_config.NumberColumn("Pts", format="%d")
     }, use_container_width=True, hide_index=True)
 
-# ========================
 # BUTEURS
-# ========================
+
 elif page == "Buteurs":
     st.subheader("Classement des Buteurs")
     df = load_df(f"""
@@ -120,9 +115,8 @@ elif page == "Buteurs":
         "Club": st.column_config.ImageColumn("Équipe", width="small")
     }, use_container_width=True, height=650, hide_index=True)
 
-# ========================
 # PASSEURS
-# ========================
+
 elif page == "Passeurs":
     st.subheader("Classement des Passeurs")
     df = load_df(f"""
@@ -141,9 +135,8 @@ elif page == "Passeurs":
         "Club": st.column_config.ImageColumn("Club", width="small")
     }, use_container_width=True, height=650, hide_index=True)
 
-# ========================
 # CONTRIBUTIONS
-# ========================
+
 elif page == "Contributions":
     st.subheader("Contributions Combinées (Buts + Passes)")
     df = load_df(f"""
@@ -179,13 +172,12 @@ elif page == "Contributions":
         "Total": st.column_config.NumberColumn("Total", format="%d")
     }, use_container_width=True, height=650, hide_index=True)
 
-# ========================
 # PALMARES 
-# ========================
+
 elif page == "Palmarès":
     st.subheader("Palmarès Ligue 1")
+    # Deux vues : (1) clubs les plus titrés, (2) historique saison par saison
 
-    # 1. TOP CLUBS - Correction des guillemets simples en doubles guillemets pour les alias
     clubs = load_df("""
         SELECT 
             logo_url AS "Logo", 
@@ -195,7 +187,6 @@ elif page == "Palmarès":
         ORDER BY titles DESC;
     """)
 
-    # 2. HISTORIQUE
     history = load_df("""
         SELECT season AS "Saison", 
                winner_logo AS " ", 
