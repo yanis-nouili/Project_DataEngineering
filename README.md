@@ -6,6 +6,7 @@ Ce projet est une application web interactive permettant de suivre les statistiq
 ### Fonctionnalités :
 * **Classement en direct** : Visualisation du classement complet avec logos des clubs.
 * **Meilleurs Buteurs & Passeurs** : Statistiques détaillées avec photos des joueurs et logos d'équipes.
+* **Contributions** : Vues agrégées
 * **Palmarès Historique** : Liste des clubs les plus titrés et historique des vainqueurs par saison.
 * **Moteur de Recherche** : Recherche globale de joueurs à travers toutes les statistiques.
 
@@ -43,13 +44,14 @@ Les données sont scrapées depuis le site web Foot Mercato :
     cd Project_DataEngineering/ligue1-scraping-app    
     ```
 2.  **Lancer l'application avec Docker** :
-    ```bash
-    docker compose up --build
-    ```
-   **Variante en arrière-plan** :
-   ```bash
-   docker compose up --build -d
-   ```
+    - **Normal** :
+      ```bash
+      docker compose up --build
+      ```
+    - **Variante en arrière-plan** :
+      ```bash
+      docker compose up --build -d
+      ```
 3. **Scraping en temps réel au lancement du projet** :
     Au premier lancement (DB vide), le scraping peut prendre environ 20 secondes, puis le dashboard se remplit.
 
@@ -62,7 +64,7 @@ Les données sont scrapées depuis le site web Foot Mercato :
 
 ### Stratégie de Scraping
 Nous utilisons Playwright en mode headless. Ce choix est dû à la nature du site source, qui utilise du chargement asynchrone pour ses tableaux. 
-Les scrapers sont orchestrés par `scraper/run_all.py` et lancés automatiquement au démarrage du conteneur via un script `entrypoint.sh` qui s'assure que la base de données est prête avant de commencer. Le premier lancement peut prendre environ 20 secondes, puis les tableaux se remplissent.
+Les scrapers sont orchestrés par `scraper/run_all.py` et lancés automatiquement au démarrage du conteneur via un script `entrypoint.sh` qui s'assure que la base de données est prête avant de commencer.
 
 
 
