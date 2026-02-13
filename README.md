@@ -11,6 +11,15 @@ Ce projet est une application web interactive permettant de suivre les statistiq
 
 ---
 
+## Sources des données (scraping)
+Les données sont scrapées depuis le site web Foot Mercato :
+- Classement Ligue 1 : https://www.footmercato.net/france/ligue-1/classement
+- Buteurs Ligue 1 : https://www.footmercato.net/france/ligue-1/buteur
+- Passeurs Ligue 1 : https://www.footmercato.net/france/ligue-1/passeur
+- Palmarès Ligue 1 : https://www.footmercato.net/france/ligue-1/palmares
+
+---
+
 ## Stack Technique
 * **Langage** : `Python 3.12`
 * **Scraping** : 
@@ -30,12 +39,12 @@ Ce projet est une application web interactive permettant de suivre les statistiq
 ### Démarrage rapide
 1.  **Cloner le dépôt** :
     ```bash
-    git clone [https://github.com/VOTRE_NOM_UTILISATEUR/VOTRE_REPO.git](https://github.com/VOTRE_NOM_UTILISATEUR/VOTRE_REPO.git)
-    cd Project_DataEngineering
+    git clone https://github.com/yanis-nouili/Project_DataEngineering.git
+    cd Project_DataEngineering/ligue1-scraping-app    
     ```
 2.  **Lancer l'application avec Docker** :
     ```bash
-    docker-compose up --build
+    docker compose up --build
     ```
 3.  **Accéder au Dashboard** :
     Une fois le déploiement terminé, ouvrez votre navigateur sur : `http://localhost:8501`
