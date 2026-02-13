@@ -34,7 +34,7 @@ Les données sont scrapées depuis le site web Foot Mercato :
 ## Installation et Lancement
 
 ### Prérequis
-* Docker et Docker Compose installés sur sa machine.
+* Docker et Docker Compose installés sur la machine.
 
 ### Démarrage rapide
 1.  **Cloner le dépôt** :
@@ -46,7 +46,14 @@ Les données sont scrapées depuis le site web Foot Mercato :
     ```bash
     docker compose up --build
     ```
-3.  **Accéder au Dashboard** :
+   **Variante en arrière-plan** :
+   ```bash
+   docker compose up --build -d
+   ```
+3. **Scraping en temps réel au lancement du projet** :
+    Au premier lancement (DB vide), le scraping peut prendre environ 20 secondes, puis le dashboard se remplit.
+
+4.  **Accéder au Dashboard** :
     Une fois le déploiement terminé, ouvrez votre navigateur sur : `http://localhost:8501`
 
 ---
