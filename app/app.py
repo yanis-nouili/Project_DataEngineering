@@ -92,8 +92,36 @@ elif page == "Classement":
     st.dataframe(df, column_config={
         " ": st.column_config.ImageColumn(" ", width="small"),
         "Pts": st.column_config.NumberColumn("Pts", format="%d")
-    }, use_container_width=True,height=650, hide_index=True)
+    }, use_container_width=True,height=520, hide_index=True)
+    
+    st.subheader("Analyse : Points vs Différence de buts (Top 10)")
 
+    chart_df = df.copy()
+    
+    chart_df = chart_df.sort_values("Pts", ascending=False).head(10)
+    chart_df = chart_df[chart_df["Équipe"] != "Toulouse"]
+    chart = (
+        alt.Chart(chart_df)
+        .mark_circle(size=120)
+        .encode(
+            x=alt.X("Diff:Q", title="Différence de buts"),
+            y=alt.Y("Pts:Q", title="Points"),
+            tooltip=["Équipe", "Pts", "Diff", "J"],
+        )
+        .properties(height=280)
+    )
+    labels = (
+        alt.Chart(chart_df)
+        .mark_text(align="left", dx=7, dy=-7)
+        .encode(
+            x="Diff:Q",
+            y="Pts:Q",
+            text="Équipe:N"
+        )
+    )
+    trend = chart.transform_regression("Diff", "Pts").mark_line()
+    st.altair_chart((chart + labels).interactive(), use_container_width=True)
+    
 # BUTEURS
 
 elif page == "Buteurs":
